@@ -1,4 +1,5 @@
-from typing import List, Set
+from typing import Set
+from collections import Counter
 from random import choice
 import re
 
@@ -14,6 +15,7 @@ class AnswerException(Exception):
 
 
 def w_filter(pos: str, included: Set, excluded: Set) -> Set:
+    """ Filter word list by possible candidates according to previous answers """
     included = (set(pos) | included) - {'*'}
     excluded = excluded - included  # can happen due to how wordle highlights
 
@@ -27,16 +29,50 @@ def w_filter(pos: str, included: Set, excluded: Set) -> Set:
     return list(f_words)
 
 
+def get_optimal_word(word_list: Set) -> str:
+    """ get most optimal word from word list
+    Heuristic based on letter frequency, no repeating letters, …
+    """
+
+    # letter frequency score
+    letter_count = Counter()
+    for word in words:
+        letter_count.update(word)
+
+    frequency_score = {
+        word: 1 / sum(map(letter_count.get, word))
+        for word in word_list
+    }
+
+    # prever words with no repeating letters
+    unique_score = {
+        word: len(word) - len(set(word))
+        for word in word_list
+    }
+
+    # scoring
+    score = {w: unique_score[w] + frequency_score[w] for w in word_list}
+
+    min_value = min(score.values())
+    possible_values = list(filter(lambda w: score[w] == min_value, score))
+    print(f" - possible {len(possible_values)}")
+    return possible_values[0]
+
+
 def terminal():
     excluded = set()
     included = set()
     position = "*****"
 
-    guesses = w_filter(position, included, excluded)
-    guess = choice(guesses)
+    def get_guess():
+        guesses = w_filter(position, included, excluded)
+        guess = get_optimal_word(guesses)
+        return len(guesses), guess
+
+    l_guesses, guess = get_guess()
 
     while True:
-        answer = input(f"Guessing '{guess}' ({len(guesses)}) > ")
+        answer = input(f"Guessing '{guess}' ({l_guesses}) > ")
 
         if answer != "":
             try:
@@ -78,8 +114,7 @@ def terminal():
             print(f"invalid input: {e}")
             continue
 
-        guesses = w_filter(position, included, excluded)
-        guess = choice(guesses)
+        l_guesses, guess = get_guess()
         print("------------------")
 
 
